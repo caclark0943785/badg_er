@@ -1,0 +1,18 @@
+{
+  "name": "badg-er",
+  "version": "1.0.0",
+  "description": "AI Opener Certificate/Badge generator with LinkedIn integration",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "import": "node scripts/import-csv.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "canvas": "^3.2.1",
+    "dotenv": "^17.3.0",
+    "express": "^5.2.1"
+  }
+}
