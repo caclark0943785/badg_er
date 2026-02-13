@@ -59,6 +59,7 @@ function main() {
 
     const participant = {
       id: generateId(),
+      claimKey: crypto.randomBytes(6).toString('hex'),
       name,
       date,
       program: 'AI Opener Certificate',
@@ -81,7 +82,8 @@ function main() {
   console.log(`\nImported ${newParticipants.length} participant(s):\n`);
   newParticipants.forEach(p => {
     console.log(`  ${p.name}`);
-    console.log(`  ${baseUrl}/cert/${p.id}`);
+    console.log(`  Public:  ${baseUrl}/cert/${p.id}`);
+    console.log(`  Claim:   ${baseUrl}/cert/${p.id}/claim/${p.claimKey}`);
     console.log();
   });
 }

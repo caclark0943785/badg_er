@@ -8,10 +8,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 const ORG_NAME = process.env.ORG_NAME || 'Miles+Partnership';
+const ORG_ID = process.env.ORG_ID || '23075';
 
 const DATA_FILE = path.join(__dirname, 'data', 'participants.json');
 const TEMPLATE_PATH = path.join(__dirname, 'assets', 'certificate-template.png');
 const HTML_TEMPLATE = path.join(__dirname, 'views', 'certificate.html');
+const CLAIM_TEMPLATE = path.join(__dirname, 'views', 'claim.html');
 
 // In-memory image cache
 const imageCache = new Map();
@@ -74,7 +76,7 @@ function buildAddToProfileUrl(participant) {
   const params = new URLSearchParams({
     startTask: 'CERTIFICATION_NAME',
     name: participant.program || 'AI Opener Certificate',
-    organizationName: ORG_NAME.replace(/\+/g, ' '),
+    organizationId: ORG_ID,
     issueYear: certDate.getFullYear().toString(),
     issueMonth: (certDate.getMonth() + 1).toString(),
     certUrl: `${BASE_URL}/cert/${participant.id}`,
@@ -152,25 +154,23 @@ app.get('/cert/:id/image', async (req, res) => {
   }
 });
 
-// GET /cert/:id — Certificate page with OG tags + LinkedIn buttons
-app.get('/cert/:id', (req, res) => {
-  const participant = getParticipant(req.params.id);
-  if (!participant) {
-    return res.status(404).send(`<!DOCTYPE html>
+// 404 helper
+function send404(res) {
+  return res.status(404).send(`<!DOCTYPE html>
 <html><head><title>Not Found</title></head>
 <body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#1a1a2e;color:#fff;">
 <div style="text-align:center"><h1>Certificate Not Found</h1><p><a href="/" style="color:#e2b857">Back to home</a></p></div>
 </body></html>`);
-  }
+}
 
+// Render a certificate page with template replacements
+function renderCertPage(templatePath, participant, extraReplacements) {
   const certUrl = `${BASE_URL}/cert/${participant.id}`;
   const imageUrl = `${BASE_URL}/cert/${participant.id}/image`;
   const formattedDate = formatDate(participant.date);
   const programName = participant.program || 'AI Opener Certificate';
-  const addToProfileUrl = buildAddToProfileUrl(participant);
-  const shareUrl = buildShareUrl(participant);
 
-  let template = fs.readFileSync(HTML_TEMPLATE, 'utf8');
+  let template = fs.readFileSync(templatePath, 'utf8');
   template = template
     .replace(/{{name}}/g, participant.name)
     .replace(/{{date}}/g, formattedDate)
@@ -178,11 +178,36 @@ app.get('/cert/:id', (req, res) => {
     .replace(/{{certUrl}}/g, certUrl)
     .replace(/{{imageUrl}}/g, imageUrl)
     .replace(/{{certId}}/g, participant.id)
-    .replace(/{{addToProfileUrl}}/g, addToProfileUrl)
-    .replace(/{{shareUrl}}/g, shareUrl)
     .replace(/{{orgName}}/g, ORG_NAME.replace(/\+/g, ' '));
 
-  res.send(template);
+  if (extraReplacements) {
+    for (const [key, value] of Object.entries(extraReplacements)) {
+      template = template.replace(new RegExp(key, 'g'), value);
+    }
+  }
+
+  return template;
+}
+
+// GET /cert/:id — Public certificate page (no LinkedIn buttons)
+app.get('/cert/:id', (req, res) => {
+  const participant = getParticipant(req.params.id);
+  if (!participant) return send404(res);
+  res.send(renderCertPage(HTML_TEMPLATE, participant));
+});
+
+// GET /cert/:id/claim/:key — Private claim page with LinkedIn buttons
+app.get('/cert/:id/claim/:key', (req, res) => {
+  const participant = getParticipant(req.params.id);
+  if (!participant || participant.claimKey !== req.params.key) return send404(res);
+
+  const addToProfileUrl = buildAddToProfileUrl(participant);
+  const shareUrl = buildShareUrl(participant);
+
+  res.send(renderCertPage(CLAIM_TEMPLATE, participant, {
+    '{{addToProfileUrl}}': addToProfileUrl,
+    '{{shareUrl}}': shareUrl,
+  }));
 });
 
 app.listen(PORT, () => {
